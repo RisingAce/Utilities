@@ -1551,3 +1551,1838 @@
                                 <button id="add-first-bill-btn" class="bg-indigo-600 text-white rounded-md py-2 px-4 hover:bg-indigo-700 transition">
                                     <i class="fas fa-plus mr-2"></i> Add First Bill
                                 </button>
+                            </div>` : 
+                            `<div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Provider</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Due Date</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200" id="bills-table-body">
+                                        ${renderBillsTable(propertyBills)}
+                                    </tbody>
+                                </table>
+                            </div>`
+                        }
+                    </div>
+                </div>
+            `;
+            
+            // Add event listeners
+            document.getElementById('add-property-bill-btn')?.addEventListener('click', () => {
+                openAddBillModal(property.id);
+            });
+            
+            document.getElementById('add-first-bill-btn')?.addEventListener('click', () => {
+                openAddBillModal(property.id);
+            });
+            
+            // Add filter functionality
+            const statusFilter = document.getElementById('bill-status-filter');
+            const typeFilter = document.getElementById('bill-type-filter');
+            
+            const filterBills = () => {
+                const status = statusFilter.value;
+                const type = typeFilter.value;
+                
+                let filteredBills = propertyBills;
+                
+                if (status !== 'all') {
+                    filteredBills = filteredBills.filter(bill => bill.status === status);
+                }
+                
+                if (type !== 'all') {
+                    filteredBills = filteredBills.filter(bill => bill.type === type);
+                }
+                
+                const billsTableBody = document.getElementById('bills-table-body');
+                if (billsTableBody) {
+                    billsTableBody.innerHTML = renderBillsTable(filteredBills);
+                    
+                    // Re-add event listeners for view bill buttons
+                    document.querySelectorAll('.view-bill-btn').forEach(button => {
+                        button.addEventListener('click', () => {
+                            const billId = button.getAttribute('data-id');
+                            openViewBillModal(billId);
+                        });
+                    });
+                }
+            };
+            
+            statusFilter?.addEventListener('change', filterBills);
+            typeFilter?.addEventListener('change', filterBills);
+            
+            // Add event listeners for view bill buttons
+            document.querySelectorAll('.view-bill-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const billId = button.getAttribute('data-id');
+                    openViewBillModal(billId);
+                });
+            });
+        }
+
+        function renderBillsTable(bills) {
+            if (bills.length === 0) {
+                return `
+                    <tr>
+                        <td colspan="6" class="px-6 py-4 whitespace-nowrap text-center text-gray-500">
+                            No bills match the selected filters
+                        </td>
+                    </tr>
+                `;
+            }
+            
+            return bills.map(bill => `
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="flex items-center">
+                            ${getUtilityIcon(bill.type)}
+                            <span class="ml-2 text-sm font-medium text-gray-900">
+                                ${bill.type === 'other' && bill.otherType ? 
+                                    bill.otherType.charAt(0).toUpperCase() + bill.otherType.slice(1) : 
+                                    bill.type.charAt(0).toUpperCase() + bill.type.slice(1).replace('-', ' ')}
+                            </span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${bill.provider || '-'}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${formatCurrency(bill.amount)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        ${formatDate(bill.dueDate)}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClass(bill.status)}">
+                            ${bill.status.charAt(0).toUpperCase() + bill.status.slice(1)}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button class="text-indigo-600 hover:text-indigo-900 view-bill-btn" data-id="${bill.id}">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function loadNotesTab(tabContent, property) {
+            const propertyNotes = appData.notes.filter(note => note.propertyId === property.id);
+            
+            tabContent.innerHTML = `
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-medium text-gray-700">Notes</h3>
+                        <button id="add-property-note-btn" class="bg-indigo-600 text-white rounded-md py-2 px-3 text-sm hover:bg-indigo-700 transition">
+                            <i class="fas fa-plus mr-1"></i> Add Note
+                        </button>
+                    </div>
+                    
+                    <div id="notes-container" class="space-y-4">
+                        ${propertyNotes.length === 0 ? 
+                            `<div class="text-center py-8">
+                                <i class="fas fa-sticky-note text-gray-400 text-4xl mb-2"></i>
+                                <p class="text-gray-500 mb-4">No notes added yet</p>
+                                <button id="add-first-note-btn" class="bg-indigo-600 text-white rounded-md py-2 px-4 hover:bg-indigo-700 transition">
+                                    <i class="fas fa-plus mr-2"></i> Add First Note
+                                </button>
+                            </div>` : 
+                            propertyNotes.map(note => `
+                                <div class="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
+                                    <div class="flex justify-between items-start mb-2">
+                                        <h4 class="font-medium">${note.title}</h4>
+                                        <div class="flex space-x-2">
+                                            <span class="text-xs text-gray-500">${formatDate(note.date)}</span>
+                                            <button class="text-red-500 hover:text-red-700 delete-note" data-id="${note.id}">
+                                                <i class="fas fa-trash-alt"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <p class="text-sm whitespace-pre-line">${note.content}</p>
+                                </div>
+                            `).join('')
+                        }
+                    </div>
+                </div>
+            `;
+            
+            // Add event listeners
+            document.getElementById('add-property-note-btn')?.addEventListener('click', () => {
+                openAddNoteModal(property.id);
+            });
+            
+            document.getElementById('add-first-note-btn')?.addEventListener('click', () => {
+                openAddNoteModal(property.id);
+            });
+            
+            // Add delete note functionality
+            document.querySelectorAll('.delete-note').forEach(button => {
+                button.addEventListener('click', () => {
+                    const noteId = button.getAttribute('data-id');
+                    confirmDeleteNote(noteId);
+                });
+            });
+        }
+
+        function loadChasersTab(tabContent, property) {
+            const propertyChasers = appData.chasers.filter(chaser => chaser.propertyId === property.id);
+            
+            // Group chasers by status (overdue, today, upcoming, completed)
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const overdueChasers = propertyChasers.filter(chaser => {
+                const chaserDate = new Date(chaser.date);
+                return chaserDate < today && !chaser.completed;
+            });
+            
+            const todayChasers = propertyChasers.filter(chaser => {
+                return isSameDay(new Date(chaser.date), today) && !chaser.completed;
+            });
+            
+            const upcomingChasers = propertyChasers.filter(chaser => {
+                const chaserDate = new Date(chaser.date);
+                return chaserDate > today && !chaser.completed;
+            });
+            
+            const completedChasers = propertyChasers.filter(chaser => chaser.completed);
+            
+            tabContent.innerHTML = `
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-lg font-medium text-gray-700">Chasers</h3>
+                        <button id="add-property-chaser-btn" class="bg-indigo-600 text-white rounded-md py-2 px-3 text-sm hover:bg-indigo-700 transition">
+                            <i class="fas fa-plus mr-1"></i> Add Chaser
+                        </button>
+                    </div>
+                    
+                    <div id="chasers-container">
+                        ${propertyChasers.length === 0 ? 
+                            `<div class="text-center py-8">
+                                <i class="fas fa-calendar-alt text-gray-400 text-4xl mb-2"></i>
+                                <p class="text-gray-500 mb-4">No chasers added yet</p>
+                                <button id="add-first-chaser-btn" class="bg-indigo-600 text-white rounded-md py-2 px-4 hover:bg-indigo-700 transition">
+                                    <i class="fas fa-plus mr-2"></i> Add First Chaser
+                                </button>
+                            </div>` : 
+                            `<div class="space-y-6">
+                                ${overdueChasers.length > 0 ? `
+                                    <div>
+                                        <h4 class="font-medium text-red-600 mb-3">Overdue</h4>
+                                        <div class="space-y-2">
+                                            ${renderChasersList(overdueChasers)}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                ${todayChasers.length > 0 ? `
+                                    <div>
+                                        <h4 class="font-medium text-indigo-600 mb-3">Today</h4>
+                                        <div class="space-y-2">
+                                            ${renderChasersList(todayChasers)}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                ${upcomingChasers.length > 0 ? `
+                                    <div>
+                                        <h4 class="font-medium text-green-600 mb-3">Upcoming</h4>
+                                        <div class="space-y-2">
+                                            ${renderChasersList(upcomingChasers)}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                                
+                                ${completedChasers.length > 0 ? `
+                                    <div>
+                                        <h4 class="font-medium text-gray-600 mb-3">Completed</h4>
+                                        <div class="space-y-2">
+                                            ${renderChasersList(completedChasers)}
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>`
+                        }
+                    </div>
+                </div>
+            `;
+            
+            // Add event listeners
+            document.getElementById('add-property-chaser-btn')?.addEventListener('click', () => {
+                openAddChaserModal(property.id);
+            });
+            
+            document.getElementById('add-first-chaser-btn')?.addEventListener('click', () => {
+                openAddChaserModal(property.id);
+            });
+            
+            // Add complete chaser functionality
+            document.querySelectorAll('.complete-chaser').forEach(button => {
+                button.addEventListener('click', () => {
+                    const chaserId = button.getAttribute('data-id');
+                    completeChaser(chaserId);
+                });
+            });
+            
+            // Add delete chaser functionality
+            document.querySelectorAll('.delete-chaser').forEach(button => {
+                button.addEventListener('click', () => {
+                    const chaserId = button.getAttribute('data-id');
+                    confirmDeleteChaser(chaserId);
+                });
+            });
+        }
+
+        function renderChasersList(chasers) {
+            return chasers.map(chaser => {
+                const chaserDate = new Date(chaser.date);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                
+                let dateText = formatDate(chaser.date);
+                if (isSameDay(chaserDate, today)) {
+                    dateText = 'Today';
+                } else if (isSameDay(chaserDate, tomorrow)) {
+                    dateText = 'Tomorrow';
+                }
+                
+                const isOverdue = chaserDate < today && !chaser.completed;
+                
+                // If the chaser is linked to a bill, get the bill info
+                let billInfo = '';
+                if (chaser.billId) {
+                    const bill = appData.bills.find(b => b.id === chaser.billId);
+                    if (bill) {
+                        billInfo = `
+                            <div class="mt-1 flex items-center">
+                                <span class="text-xs text-gray-500 mr-1">Related to:</span>
+                                <span class="text-xs inline-flex items-center">
+                                    ${getUtilityIcon(bill.type)}
+                                    <span class="ml-1">${bill.provider || bill.type}</span>
+                                </span>
+                            </div>
+                        `;
+                    }
+                }
+                
+                return `
+                    <div class="p-3 border rounded-lg hover:bg-gray-50 transition ${isOverdue ? 'border-red-300 bg-red-50' : chaser.completed ? 'border-gray-300 bg-gray-50' : ''}">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="font-medium">${chaser.title}</p>
+                                ${billInfo}
+                                <div class="flex items-center mt-1">
+                                    <span class="text-sm text-gray-500 mr-2">${dateText}</span>
+                                    <span class="inline-flex px-2 py-1 text-xs rounded-full ${getPriorityClass(chaser.priority)}">${chaser.priority}</span>
+                                </div>
+                            </div>
+                            <div class="flex space-x-2">
+                                ${!chaser.completed ? `
+                                    <button class="text-green-600 hover:text-green-800 complete-chaser" data-id="${chaser.id}" title="Mark as Complete">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                ` : ''}
+                                <button class="text-red-500 hover:text-red-700 delete-chaser" data-id="${chaser.id}" title="Delete">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+                        ${chaser.notes ? `
+                            <div class="mt-2 pt-2 border-t">
+                                <p class="text-sm text-gray-600">${chaser.notes}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Functions for upcoming chasers view
+        function refreshUpcomingChasers() {
+            const chasersList = document.getElementById('chasers-list');
+            const filterOption = document.getElementById('chaser-filter').value;
+            const sortOption = document.getElementById('chaser-sort').value;
+            
+            // Get all chasers
+            let chasers = [...appData.chasers];
+            
+            // Apply filters
+            chasers = filterChasers(chasers, filterOption);
+            
+            // Apply sort
+            chasers = sortChasers(chasers, sortOption);
+            
+            if (chasers.length === 0) {
+                chasersList.innerHTML = '<p class="text-gray-500 text-center py-4">No upcoming chasers</p>';
+                return;
+            }
+            
+            chasersList.innerHTML = '';
+            
+            chasers.forEach(chaser => {
+                const property = appData.properties.find(p => p.id === chaser.propertyId);
+                const propertyName = property ? property.name : 'Unknown property';
+                
+                const chaserDate = new Date(chaser.date);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                
+                let dateText = formatDate(chaser.date);
+                if (isSameDay(chaserDate, today)) {
+                    dateText = 'Today';
+                } else if (isSameDay(chaserDate, tomorrow)) {
+                    dateText = 'Tomorrow';
+                }
+                
+                const isOverdue = chaserDate < today && !chaser.completed;
+                
+                // If the chaser is linked to a bill, get the bill info
+                let billInfo = '';
+                if (chaser.billId) {
+                    const bill = appData.bills.find(b => b.id === chaser.billId);
+                    if (bill) {
+                        billInfo = `
+                            <div class="mt-1 flex items-center">
+                                <span class="text-xs text-gray-500 mr-1">Related to:</span>
+                                <span class="text-xs inline-flex items-center">
+                                    ${getUtilityIcon(bill.type)}
+                                    <span class="ml-1">${bill.provider || bill.type}</span>
+                                </span>
+                            </div>
+                        `;
+                    }
+                }
+                
+                const chaserItem = document.createElement('div');
+                chaserItem.className = `p-4 border rounded-lg hover:bg-gray-50 transition ${isOverdue ? 'border-red-300 bg-red-50' : chaser.completed ? 'border-gray-300 bg-gray-50' : ''}`;
+                chaserItem.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-medium">${chaser.title}</p>
+                            <p class="text-sm text-gray-600">${propertyName}</p>
+                            ${billInfo}
+                            <div class="flex items-center mt-1">
+                                <span class="text-sm text-gray-500 mr-2">${dateText}</span>
+                                <span class="inline-flex px-2 py-1 text-xs rounded-full ${getPriorityClass(chaser.priority)}">${chaser.priority}</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2">
+                            ${!chaser.completed ? `
+                                <button class="text-green-600 hover:text-green-800 complete-global-chaser" data-id="${chaser.id}" title="Mark as Complete">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            ` : ''}
+                            <button class="text-red-500 hover:text-red-700 delete-global-chaser" data-id="${chaser.id}" title="Delete">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    ${chaser.notes ? `
+                        <div class="mt-2 pt-2 border-t">
+                            <p class="text-sm text-gray-600">${chaser.notes}</p>
+                        </div>
+                    ` : ''}
+                `;
+                
+                chasersList.appendChild(chaserItem);
+            });
+            
+            // Add event listeners
+            document.querySelectorAll('.complete-global-chaser').forEach(button => {
+                button.addEventListener('click', () => {
+                    const chaserId = button.getAttribute('data-id');
+                    completeChaser(chaserId, true);
+                });
+            });
+            
+            document.querySelectorAll('.delete-global-chaser').forEach(button => {
+                button.addEventListener('click', () => {
+                    const chaserId = button.getAttribute('data-id');
+                    confirmDeleteChaser(chaserId, true);
+                });
+            });
+        }
+
+        function filterChasers(chasers, filterOption) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            switch (filterOption) {
+                case 'today':
+                    return chasers.filter(chaser => {
+                        return isSameDay(new Date(chaser.date), today) && !chaser.completed;
+                    });
+                case 'week':
+                    const nextWeek = new Date(today);
+                    nextWeek.setDate(nextWeek.getDate() + 7);
+                    
+                    return chasers.filter(chaser => {
+                        const chaserDate = new Date(chaser.date);
+                        return chaserDate >= today && chaserDate <= nextWeek && !chaser.completed;
+                    });
+                case 'month':
+                    const nextMonth = new Date(today);
+                    nextMonth.setMonth(nextMonth.getMonth() + 1);
+                    
+                    return chasers.filter(chaser => {
+                        const chaserDate = new Date(chaser.date);
+                        return chaserDate >= today && chaserDate <= nextMonth && !chaser.completed;
+                    });
+                case 'overdue':
+                    return chasers.filter(chaser => {
+                        const chaserDate = new Date(chaser.date);
+                        return chaserDate < today && !chaser.completed;
+                    });
+                default: // 'all'
+                    return chasers;
+            }
+        }
+
+        function sortChasers(chasers, sortOption) {
+            switch (sortOption) {
+                case 'date-asc':
+                    return chasers.sort((a, b) => new Date(a.date) - new Date(b.date));
+                case 'date-desc':
+                    return chasers.sort((a, b) => new Date(b.date) - new Date(a.date));
+                case 'property':
+                    return chasers.sort((a, b) => {
+                        const propertyA = appData.properties.find(p => p.id === a.propertyId);
+                        const propertyB = appData.properties.find(p => p.id === b.propertyId);
+                        
+                        const nameA = propertyA ? propertyA.name : '';
+                        const nameB = propertyB ? propertyB.name : '';
+                        
+                        return nameA.localeCompare(nameB);
+                    });
+                case 'priority':
+                    const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
+                    
+                    return chasers.sort((a, b) => {
+                        return priorityOrder[a.priority] - priorityOrder[b.priority];
+                    });
+                default:
+                    return chasers;
+            }
+        }
+
+        // Modal functions
+        function openAddPropertyModal() {
+            // Reset form
+            document.getElementById('add-property-form').reset();
+            
+            // Show modal
+            document.getElementById('add-property-modal').classList.remove('hidden');
+        }
+
+        function openEditPropertyModal(property) {
+            // Fill form with property data
+            document.getElementById('property-name').value = property.name;
+            document.getElementById('property-address').value = property.address || '';
+            document.getElementById('landlord-name').value = property.landlordName || '';
+            document.getElementById('landlord-contact').value = property.landlordContact || '';
+            document.getElementById('property-notes').value = property.notes || '';
+            
+            // Update form submission handler to edit instead of add
+            const form = document.getElementById('add-property-form');
+            form.onsubmit = (e) => {
+                e.preventDefault();
+                
+                // Update property
+                property.name = document.getElementById('property-name').value;
+                property.address = document.getElementById('property-address').value;
+                property.landlordName = document.getElementById('landlord-name').value;
+                property.landlordContact = document.getElementById('landlord-contact').value;
+                property.notes = document.getElementById('property-notes').value;
+                
+                // Save data
+                saveData();
+                
+                // Add activity
+                addActivity(`Property details updated`, property.id);
+                
+                // Refresh UI
+                loadPropertyDetail(property.id);
+                refreshPropertyList();
+                
+                // Close modal
+                document.getElementById('add-property-modal').classList.add('hidden');
+                
+                // Show notification
+                showNotification('Success', 'Property updated successfully', 'success');
+            };
+            
+            // Update modal title
+            document.querySelector('#add-property-modal h2').textContent = 'Edit Property';
+            
+            // Update submit button text
+            document.querySelector('#add-property-form button[type="submit"]').textContent = 'Update Property';
+            
+            // Show modal
+            document.getElementById('add-property-modal').classList.remove('hidden');
+        }
+
+        function openAddBillModal(propertyId) {
+            // Reset form
+            document.getElementById('add-bill-form').reset();
+            
+            // Set property ID
+            document.getElementById('bill-property-id').value = propertyId;
+            
+            // Reset file upload
+            uploadedFile = null;
+            document.getElementById('file-preview-container').classList.add('hidden');
+            
+            // Set today's date as default for bill date
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('bill-date').value = today;
+            
+            // Reset other bill type field
+            document.getElementById('other-bill-type-container').classList.add('hidden');
+            
+            // Update form submission handler
+            const form = document.getElementById('add-bill-form');
+            form.onsubmit = (e) => {
+                e.preventDefault();
+                
+                const billType = document.getElementById('bill-type').value;
+                let billTypeValue = billType;
+                
+                if (billType === 'other') {
+                    billTypeValue = document.getElementById('other-bill-type').value.toLowerCase();
+                }
+                
+                // Create new bill
+                const newBill = {
+                    id: generateId(),
+                    propertyId: document.getElementById('bill-property-id').value,
+                    type: billType,
+                    otherType: billType === 'other' ? document.getElementById('other-bill-type').value : null,
+                    provider: document.getElementById('bill-provider').value,
+                    amount: document.getElementById('bill-amount').value,
+                    date: document.getElementById('bill-date').value,
+                    dueDate: document.getElementById('bill-due-date').value,
+                    status: document.getElementById('bill-status').value,
+                    notes: document.getElementById('bill-notes').value,
+                    file: uploadedFile,
+                    created: new Date().toISOString()
+                };
+                
+                // Add bill to data
+                appData.bills.push(newBill);
+                
+                // Save data
+                saveData();
+                
+                // Add activity
+                const property = appData.properties.find(p => p.id === propertyId);
+                addActivity(`New ${billTypeValue} bill added`, property.id);
+                
+                // Refresh UI
+                if (currentPropertyId) {
+                    document.querySelector('.tab-btn.text-indigo-600').click();
+                } else {
+                    refreshDashboard();
+                }
+                
+                // Close modal
+                document.getElementById('add-bill-modal').classList.add('hidden');
+                
+                // Show notification
+                showNotification('Success', 'Bill added successfully', 'success');
+            };
+            
+            // Update modal title and button
+            document.querySelector('#add-bill-modal h2').textContent = 'Add Utility Bill';
+            document.querySelector('#add-bill-form button[type="submit"]').textContent = 'Add Bill';
+            
+            // Show modal
+            document.getElementById('add-bill-modal').classList.remove('hidden');
+        }
+
+        function openViewBillModal(billId) {
+            const bill = appData.bills.find(b => b.id === billId);
+            if (!bill) return;
+            
+            currentBillId = billId;
+            
+            // Get property
+            const property = appData.properties.find(p => p.id === bill.propertyId);
+            
+            // Fill modal with bill data
+            document.getElementById('view-bill-title').textContent = `${bill.type.charAt(0).toUpperCase() + bill.type.slice(1).replace('-', ' ')} Bill`;
+            document.getElementById('view-bill-property').textContent = property ? property.name : 'Unknown property';
+            
+            document.getElementById('view-bill-type').textContent = bill.type === 'other' && bill.otherType ? 
+                bill.otherType.charAt(0).toUpperCase() + bill.otherType.slice(1) : 
+                bill.type.charAt(0).toUpperCase() + bill.type.slice(1).replace('-', ' ');
+                
+            document.getElementById('view-bill-provider').textContent = bill.provider || 'Not specified';
+            document.getElementById('view-bill-amount').textContent = formatCurrency(bill.amount);
+            document.getElementById('view-bill-date').textContent = formatDate(bill.date);
+            document.getElementById('view-bill-due-date').textContent = formatDate(bill.dueDate);
+            
+            const statusEl = document.getElementById('view-bill-status');
+            statusEl.textContent = bill.status.charAt(0).toUpperCase() + bill.status.slice(1);
+            statusEl.className = `font-medium ${getStatusClass(bill.status)} inline-block px-2 py-1 rounded-full text-xs`;
+            
+            document.getElementById('view-bill-notes').textContent = bill.notes || 'No notes';
+            
+            // Display bill document if available
+            const noDocumentMessage = document.getElementById('no-document-message');
+            const billImagePreview = document.getElementById('bill-image-preview');
+            const pdfRenderCanvas = document.getElementById('pdf-render-canvas');
+            const documentActions = document.getElementById('document-actions');
+            
+            noDocumentMessage.classList.remove('hidden');
+            billImagePreview.classList.add('hidden');
+            pdfRenderCanvas.classList.add('hidden');
+            documentActions.classList.add('hidden');
+            
+            if (bill.file) {
+                noDocumentMessage.classList.add('hidden');
+                documentActions.classList.remove('hidden');
+                
+                // Check file type
+                if (bill.file.type.startsWith('image/')) {
+                    // Display image
+                    billImagePreview.src = bill.file.data;
+                    billImagePreview.classList.remove('hidden');
+                } else if (bill.file.type === 'application/pdf') {
+                    // Display PDF
+                    pdfRenderCanvas.classList.remove('hidden');
+                    
+                    // Render PDF using PDF.js
+                    const loadingTask = pdfjsLib.getDocument({ data: atob(bill.file.data.split(',')[1]) });
+                    loadingTask.promise.then(pdf => {
+                        pdf.getPage(1).then(page => {
+                            const viewport = page.getViewport({ scale: 1.5 });
+                            const canvas = pdfRenderCanvas;
+                            const context = canvas.getContext('2d');
+                            
+                            canvas.height = viewport.height;
+                            canvas.width = viewport.width;
+                            
+                            const renderContext = {
+                                canvasContext: context,
+                                viewport: viewport
+                            };
+                            
+                            page.render(renderContext);
+                        });
+                    }).catch(error => {
+                        console.error('Error rendering PDF:', error);
+                        noDocumentMessage.classList.remove('hidden');
+                        pdfRenderCanvas.classList.add('hidden');
+                    });
+                }
+            }
+            
+            // Set up download document button
+            document.getElementById('download-document').onclick = () => {
+                if (bill.file) {
+                    // Create a temporary link element
+                    const link = document.createElement('a');
+                    link.href = bill.file.data;
+                    link.download = `${property ? property.name : 'property'}_${bill.type}_bill${bill.file.name ? '_' + bill.file.name : ''}`;
+                    
+                    // Trigger download
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            };
+            
+            // Set up edit bill button
+            document.getElementById('edit-bill-btn').onclick = () => {
+                // Close view modal
+                document.getElementById('view-bill-modal').classList.add('hidden');
+                
+                // Open edit modal
+                openEditBillModal(bill);
+            };
+            
+            // Set up add chaser button
+            document.getElementById('add-bill-chaser-btn').onclick = () => {
+                // Close view modal
+                document.getElementById('view-bill-modal').classList.add('hidden');
+                
+                // Open add chaser modal with bill ID
+                openAddChaserModal(bill.propertyId, bill.id);
+            };
+            
+            // Set up delete bill button
+            document.getElementById('delete-bill-btn').onclick = () => {
+                // Close view modal
+                document.getElementById('view-bill-modal').classList.add('hidden');
+                
+                // Open confirm modal
+                confirmDeleteBill(bill.id);
+            };
+            
+            // Show modal
+            document.getElementById('view-bill-modal').classList.remove('hidden');
+        }
+
+        function openEditBillModal(bill) {
+            // Fill form with bill data
+            document.getElementById('bill-property-id').value = bill.propertyId;
+            document.getElementById('bill-type').value = bill.type;
+            
+            if (bill.type === 'other' && bill.otherType) {
+                document.getElementById('other-bill-type-container').classList.remove('hidden');
+                document.getElementById('other-bill-type').value = bill.otherType;
+            } else {
+                document.getElementById('other-bill-type-container').classList.add('hidden');
+            }
+            
+            document.getElementById('bill-provider').value = bill.provider || '';
+            document.getElementById('bill-amount').value = bill.amount || '';
+            document.getElementById('bill-date').value = bill.date || '';
+            document.getElementById('bill-due-date').value = bill.dueDate || '';
+            document.getElementById('bill-status').value = bill.status || 'pending';
+            document.getElementById('bill-notes').value = bill.notes || '';
+            
+            // Handle file
+            uploadedFile = bill.file || null;
+            
+            if (uploadedFile) {
+                document.getElementById('file-preview-container').classList.remove('hidden');
+                document.getElementById('file-name').textContent = uploadedFile.name || 'Bill document';
+            } else {
+                document.getElementById('file-preview-container').classList.add('hidden');
+            }
+            
+            // Update form submission handler
+            const form = document.getElementById('add-bill-form');
+            form.onsubmit = (e) => {
+                e.preventDefault();
+                
+                const billType = document.getElementById('bill-type').value;
+                
+                // Update bill
+                bill.type = billType;
+                bill.otherType = billType === 'other' ? document.getElementById('other-bill-type').value : null;
+                bill.provider = document.getElementById('bill-provider').value;
+                bill.amount = document.getElementById('bill-amount').value;
+                bill.date = document.getElementById('bill-date').value;
+                bill.dueDate = document.getElementById('bill-due-date').value;
+                bill.status = document.getElementById('bill-status').value;
+                bill.notes = document.getElementById('bill-notes').value;
+                bill.file = uploadedFile;
+                bill.updated = new Date().toISOString();
+                
+                // Save data
+                saveData();
+                
+                // Add activity
+                const property = appData.properties.find(p => p.id === bill.propertyId);
+                addActivity(`Bill updated`, property.id);
+                
+                // Refresh UI
+                if (currentPropertyId) {
+                    document.querySelector('.tab-btn.text-indigo-600').click();
+                } else {
+                    refreshDashboard();
+                }
+                
+                // Close modal
+                document.getElementById('add-bill-modal').classList.add('hidden');
+                
+                // Show notification
+                showNotification('Success', 'Bill updated successfully', 'success');
+            };
+            
+            // Update modal title and button
+            document.querySelector('#add-bill-modal h2').textContent = 'Edit Utility Bill';
+            document.querySelector('#add-bill-form button[type="submit"]').textContent = 'Update Bill';
+            
+            // Show modal
+            document.getElementById('add-bill-modal').classList.remove('hidden');
+        }
+
+        function openAddNoteModal(propertyId) {
+            // Reset form
+            document.getElementById('add-note-form').reset();
+            
+            // Set property ID
+            document.getElementById('note-property-id').value = propertyId;
+            
+            // Update form submission handler
+            const form = document.getElementById('add-note-form');
+            form.onsubmit = (e) => {
+                e.preventDefault();
+                
+                // Create new note
+                const newNote = {
+                    id: generateId(),
+                    propertyId: document.getElementById('note-property-id').value,
+                    title: document.getElementById('note-title').value,
+                    content: document.getElementById('note-content').value,
+                    date: new Date().toISOString()
+                };
+                
+                // Add note to data
+                appData.notes.push(newNote);
+                
+                // Save data
+                saveData();
+                
+                // Add activity
+                const property = appData.properties.find(p => p.id === propertyId);
+                addActivity(`New note added: ${newNote.title}`, property.id);
+                
+                // Refresh UI
+                if (currentPropertyId) {
+                    document.querySelector('.tab-btn.text-indigo-600').click();
+                } else {
+                    refreshDashboard();
+                }
+                
+                // Close modal
+                document.getElementById('add-note-modal').classList.add('hidden');
+                
+                // Show notification
+                showNotification('Success', 'Note added successfully', 'success');
+            };
+            
+            // Show modal
+            document.getElementById('add-note-modal').classList.remove('hidden');
+        }
+
+        function openAddChaserModal(propertyId, billId = null) {
+            // Reset form
+            document.getElementById('add-chaser-form').reset();
+            
+            // Set property ID and bill ID
+            document.getElementById('chaser-property-id').value = propertyId;
+            document.getElementById('chaser-bill-id').value = billId || '';
+            
+            // Set tomorrow's date as default for chaser date
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('chaser-date').value = tomorrow.toISOString().split('T')[0];
+            
+            // If a bill is specified, pre-fill the title
+            if (billId) {
+                const bill = appData.bills.find(b => b.id === billId);
+                if (bill) {
+                    document.getElementById('chaser-title').value = `Follow up on ${bill.type} bill`;
+                }
+            }
+            
+            // Update form submission handler
+            const form = document.getElementById('add-chaser-form');
+            form.onsubmit = (e) => {
+                e.preventDefault();
+                
+                // Create new chaser
+                const newChaser = {
+                    id: generateId(),
+                    propertyId: document.getElementById('chaser-property-id').value,
+                    billId: document.getElementById('chaser-bill-id').value || null,
+                    title: document.getElementById('chaser-title').value,
+                    date: document.getElementById('chaser-date').value,
+                    priority: document.getElementById('chaser-priority').value,
+                    notes: document.getElementById('chaser-notes').value,
+                    completed: false,
+                    created: new Date().toISOString()
+                };
+                
+                // Add chaser to data
+                appData.chasers.push(newChaser);
+                
+                // Save data
+                saveData();
+                
+                // Add activity
+                const property = appData.properties.find(p => p.id === propertyId);
+                addActivity(`New chaser added: ${newChaser.title}`, property.id);
+                
+                // Create notification for chaser
+                createChaserNotification(newChaser);
+                
+                // Refresh UI
+                if (currentPropertyId) {
+                    document.querySelector('.tab-btn.text-indigo-600').click();
+                } else {
+                    refreshDashboard();
+                }
+                
+                // Close modal
+                document.getElementById('add-chaser-modal').classList.add('hidden');
+                
+                // Show notification
+                showNotification('Success', 'Chaser added successfully', 'success');
+            };
+            
+            // Show modal
+            document.getElementById('add-chaser-modal').classList.remove('hidden');
+        }
+
+        function confirmDeleteProperty(propertyId) {
+            // Get property
+            const property = appData.properties.find(p => p.id === propertyId);
+            if (!property) return;
+            
+            // Set confirm modal content
+            document.getElementById('confirm-title').textContent = 'Delete Property';
+            document.getElementById('confirm-message').textContent = `Are you sure you want to delete "${property.name}"? This will also delete all bills, notes, and chasers associated with this property.`;
+            
+            // Set confirm action
+            document.getElementById('confirm-action').onclick = () => {
+                // Get associated items
+                const propertyBills = appData.bills.filter(bill => bill.propertyId === propertyId);
+                const propertyNotes = appData.notes.filter(note => note.propertyId === propertyId);
+                const propertyChasers = appData.chasers.filter(chaser => chaser.propertyId === propertyId);
+                
+                // Remove property and associated items
+                appData.properties = appData.properties.filter(p => p.id !== propertyId);
+                appData.bills = appData.bills.filter(bill => bill.propertyId !== propertyId);
+                appData.notes = appData.notes.filter(note => note.propertyId !== propertyId);
+                appData.chasers = appData.chasers.filter(chaser => chaser.propertyId !== propertyId);
+                
+                // Remove activities for this property
+                appData.activities = appData.activities.filter(activity => activity.propertyId !== propertyId);
+                
+                // Save data
+                saveData();
+                
+                // Refresh UI
+                refreshPropertyList();
+                showView('properties');
+                
+                // Close modal
+                document.getElementById('confirm-modal').classList.add('hidden');
+                
+                // Show notification
+                showNotification('Success', 'Property deleted successfully', 'success');
+            };
+            
+            // Show modal
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
+        function confirmDeleteBill(billId) {
+            // Get bill
+            const bill = appData.bills.find(b => b.id === billId);
+            if (!bill) return;
+            
+            // Get property
+            const property = appData.properties.find(p => p.id === bill.propertyId);
+            
+            // Set confirm modal content
+            document.getElementById('confirm-title').textContent = 'Delete Bill';
+            document.getElementById('confirm-message').textContent = `Are you sure you want to delete this ${bill.type} bill?`;
+            
+            // Set confirm action
+            document.getElementById('confirm-action').onclick = () => {
+                // Remove bill
+                appData.bills = appData.bills.filter(b => b.id !== billId);
+                
+                // Remove chasers associated with this bill
+                appData.chasers = appData.chasers.filter(chaser => chaser.billId !== billId);
+                
+                // Save data
+                saveData();
+                
+                // Add activity
+                if (property) {
+                    addActivity(`Bill deleted`, property.id);
+                }
+                
+                // Refresh UI
+                if (currentPropertyId) {
+                    document.querySelector('.tab-btn.text-indigo-600').click();
+                } else {
+                    refreshDashboard();
+                }
+                
+                // Close modal
+                document.getElementById('confirm-modal').classList.add('hidden');
+                
+                // Show notification
+                showNotification('Success', 'Bill deleted successfully', 'success');
+            };
+            
+            // Show modal
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
+        function confirmDeleteNote(noteId) {
+            // Get note
+            const note = appData.notes.find(n => n.id === noteId);
+            if (!note) return;
+            
+            // Get property
+            const property = appData.properties.find(p => p.id === note.propertyId);
+            
+            // Set confirm modal content
+            document.getElementById('confirm-title').textContent = 'Delete Note';
+            document.getElementById('confirm-message').textContent = `Are you sure you want to delete the note "${note.title}"?`;
+            
+            // Set confirm action
+            document.getElementById('confirm-action').onclick = () => {
+                // Remove note
+                appData.notes = appData.notes.filter(n => n.id !== noteId);
+                
+                // Save data
+                saveData();
+                
+                // Add activity
+                if (property) {
+                    addActivity(`Note deleted: ${note.title}`, property.id);
+                }
+                
+                // Refresh UI
+                if (currentPropertyId) {
+                    document.querySelector('.tab-btn.text-indigo-600').click();
+                } else {
+                    refreshDashboard();
+                }
+                
+                // Close modal
+                document.getElementById('confirm-modal').classList.add('hidden');
+                
+                // Show notification
+                showNotification('Success', 'Note deleted successfully', 'success');
+            };
+            
+            // Show modal
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
+        function confirmDeleteChaser(chaserId, fromGlobal = false) {
+            // Get chaser
+            const chaser = appData.chasers.find(c => c.id === chaserId);
+            if (!chaser) return;
+            
+            // Get property
+            const property = appData.properties.find(p => p.id === chaser.propertyId);
+            
+            // Set confirm modal content
+            document.getElementById('confirm-title').textContent = 'Delete Chaser';
+            document.getElementById('confirm-message').textContent = `Are you sure you want to delete the chaser "${chaser.title}"?`;
+            
+            // Set confirm action
+            document.getElementById('confirm-action').onclick = () => {
+                // Remove chaser
+                appData.chasers = appData.chasers.filter(c => c.id !== chaserId);
+                
+                // Save data
+                saveData();
+                
+                // Add activity
+                if (property) {
+                    addActivity(`Chaser deleted: ${chaser.title}`, property.id);
+                }
+                
+                // Refresh UI
+                if (fromGlobal) {
+                    refreshUpcomingChasers();
+                } else if (currentPropertyId) {
+                    document.querySelector('.tab-btn.text-indigo-600').click();
+                } else {
+                    refreshDashboard();
+                }
+                
+                // Close modal
+                document.getElementById('confirm-modal').classList.add('hidden');
+                
+                // Show notification
+                showNotification('Success', 'Chaser deleted successfully', 'success');
+            };
+            
+            // Show modal
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
+        function completeChaser(chaserId, fromGlobal = false) {
+            // Get chaser
+            const chaser = appData.chasers.find(c => c.id === chaserId);
+            if (!chaser) return;
+            
+            // Mark as completed
+            chaser.completed = true;
+            chaser.completedDate = new Date().toISOString();
+            
+            // Save data
+            saveData();
+            
+            // Add activity
+            const property = appData.properties.find(p => p.id === chaser.propertyId);
+            if (property) {
+                addActivity(`Chaser completed: ${chaser.title}`, property.id);
+            }
+            
+            // Refresh UI
+            if (fromGlobal) {
+                refreshUpcomingChasers();
+            } else if (currentPropertyId) {
+                document.querySelector('.tab-btn.text-indigo-600').click();
+            } else {
+                refreshDashboard();
+            }
+            
+            // Show notification
+            showNotification('Success', 'Chaser marked as complete', 'success');
+        }
+
+        // Helper functions
+        function addActivity(action, propertyId) {
+            appData.activities.push({
+                id: generateId(),
+                propertyId,
+                action,
+                date: new Date().toISOString()
+            });
+            
+            // Limit activities to 100
+            if (appData.activities.length > 100) {
+                appData.activities = appData.activities.slice(-100);
+            }
+            
+            saveData();
+        }
+
+        function createChaserNotification(chaser) {
+            const property = appData.properties.find(p => p.id === chaser.propertyId);
+            const propertyName = property ? property.name : 'Unknown property';
+            
+            const notification = {
+                id: generateId(),
+                chaserId: chaser.id,
+                propertyId: chaser.propertyId,
+                title: chaser.title,
+                message: `Chaser due for ${propertyName}`,
+                date: chaser.date,
+                created: new Date().toISOString(),
+                read: false
+            };
+            
+            appData.notifications.push(notification);
+            saveData();
+            updateNotificationCount();
+        }
+
+        function updateNotificationCount() {
+            const unreadCount = appData.notifications.filter(n => !n.read).length;
+            const notificationCountBadge = document.getElementById('notification-count');
+            
+            if (unreadCount > 0) {
+                notificationCountBadge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                notificationCountBadge.classList.remove('hidden');
+            } else {
+                notificationCountBadge.classList.add('hidden');
+            }
+        }
+
+        function showNotification(title, message, type = 'success') {
+            const notification = document.getElementById('notification');
+            const notificationTitle = document.getElementById('notification-title');
+            const notificationMessage = document.getElementById('notification-message');
+            const notificationIcon = document.getElementById('notification-icon');
+            
+            // Set content
+            notificationTitle.textContent = title;
+            notificationMessage.textContent = message;
+            
+            // Set icon based on type
+            if (type === 'success') {
+                notificationIcon.innerHTML = '<i class="fas fa-check-circle text-xl"></i>';
+                notificationIcon.className = 'mr-3 text-green-500';
+            } else if (type === 'error') {
+                notificationIcon.innerHTML = '<i class="fas fa-exclamation-circle text-xl"></i>';
+                notificationIcon.className = 'mr-3 text-red-500';
+            } else if (type === 'warning') {
+                notificationIcon.innerHTML = '<i class="fas fa-exclamation-triangle text-xl"></i>';
+                notificationIcon.className = 'mr-3 text-yellow-500';
+            } else {
+                notificationIcon.innerHTML = '<i class="fas fa-info-circle text-xl"></i>';
+                notificationIcon.className = 'mr-3 text-blue-500';
+            }
+            
+            // Show notification
+            notification.classList.add('show');
+            
+            // Hide after 3 seconds
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // Data storage functions
+        function saveData() {
+            localStorage.setItem('propertyUtilityTracker', JSON.stringify(appData));
+            
+            // Check for upcoming chasers and create notifications
+            checkUpcomingChasers();
+        }
+
+        function loadData() {
+            const savedData = localStorage.getItem('propertyUtilityTracker');
+            
+            if (savedData) {
+                appData = JSON.parse(savedData);
+                
+                // Check for upcoming chasers on load
+                checkUpcomingChasers();
+                
+                return true;
+            }
+            
+            return false;
+        }
+
+        function exportData(format = 'json') {
+            if (format === 'json') {
+                const dataStr = JSON.stringify(appData, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+                
+                const exportFileName = 'property_utility_tracker_' + new Date().toISOString().split('T')[0] + '.json';
+                
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileName);
+                linkElement.click();
+            } else if (format === 'csv') {
+                // Export properties as CSV
+                exportCSV('properties', appData.properties, ['id', 'name', 'address', 'landlordName', 'landlordContact', 'notes']);
+                
+                // Export bills as CSV
+                exportCSV('bills', appData.bills, ['id', 'propertyId', 'type', 'otherType', 'provider', 'amount', 'date', 'dueDate', 'status', 'notes', 'created', 'updated']);
+                
+                // Export notes as CSV
+                exportCSV('notes', appData.notes, ['id', 'propertyId', 'title', 'content', 'date']);
+                
+                // Export chasers as CSV
+                exportCSV('chasers', appData.chasers, ['id', 'propertyId', 'billId', 'title', 'date', 'priority', 'notes', 'completed', 'completedDate', 'created']);
+            }
+        }
+
+        function exportCSV(name, data, fields) {
+            // Create CSV header
+            let csvContent = fields.join(',') + '\n';
+            
+            // Add data rows
+            data.forEach(item => {
+                const row = fields.map(field => {
+                    const value = item[field];
+                    
+                    if (value === null || value === undefined) {
+                        return '';
+                    }
+                    
+                    if (typeof value === 'string') {
+                        // Escape quotes and wrap in quotes
+                        return `"${value.replace(/"/g, '""')}"`;
+                    }
+                    
+                    return value;
+                });
+                
+                csvContent += row.join(',') + '\n';
+            });
+            
+            // Create download link
+            const dataUri = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csvContent);
+            const exportFileName = `property_utility_tracker_${name}_` + new Date().toISOString().split('T')[0] + '.csv';
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileName);
+            linkElement.click();
+        }
+
+        function importData(data) {
+            try {
+                // Validate data structure
+                if (!data.properties || !Array.isArray(data.properties)) {
+                    throw new Error('Invalid data format: properties array missing');
+                }
+                
+                if (!data.bills || !Array.isArray(data.bills)) {
+                    throw new Error('Invalid data format: bills array missing');
+                }
+                
+                if (!data.chasers || !Array.isArray(data.chasers)) {
+                    throw new Error('Invalid data format: chasers array missing');
+                }
+                
+                if (!data.notes || !Array.isArray(data.notes)) {
+                    throw new Error('Invalid data format: notes array missing');
+                }
+                
+                // Merge or replace data
+                appData = data;
+                
+                // Save merged data
+                saveData();
+                
+                // Refresh UI
+                refreshPropertyList();
+                refreshDashboard();
+                
+                return true;
+            } catch (error) {
+                console.error('Error importing data:', error);
+                showNotification('Error', 'Failed to import data: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        function clearAllData() {
+            // Set confirm modal content
+            document.getElementById('confirm-title').textContent = 'Clear All Data';
+            document.getElementById('confirm-message').textContent = 'Are you sure you want to clear all data? This action cannot be undone.';
+            
+            // Set confirm action
+            document.getElementById('confirm-action').onclick = () => {
+                // Reset app data
+                appData = {
+                    properties: [],
+                    bills: [],
+                    chasers: [],
+                    notes: [],
+                    notifications: [],
+                    activities: [],
+                    settings: {
+                        darkMode: false,
+                        enableNotifications: true,
+                        notificationDays: 3
+                    }
+                };
+                
+                // Save empty data
+                saveData();
+                
+                // Refresh UI
+                refreshPropertyList();
+                showView('dashboard');
+                
+                // Close modal
+                document.getElementById('confirm-modal').classList.add('hidden');
+                
+                // Show notification
+                showNotification('Success', 'All data has been cleared', 'success');
+            };
+            
+            // Show modal
+            document.getElementById('confirm-modal').classList.remove('hidden');
+        }
+
+        // Notification functions
+        function checkUpcomingChasers() {
+            if (!appData.settings.enableNotifications) return;
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const notificationDays = appData.settings.notificationDays;
+            
+            appData.chasers.forEach(chaser => {
+                if (chaser.completed) return;
+                
+                const chaserDate = new Date(chaser.date);
+                chaserDate.setHours(0, 0, 0, 0);
+                
+                const timeDiff = chaserDate.getTime() - today.getTime();
+                const diffDays = Math.ceil(timeDiff / (1000 * 3600 * 24));
+                
+                if (diffDays === notificationDays) {
+                    // Check if notification already exists
+                    const notificationExists = appData.notifications.some(
+                        n => n.chaserId === chaser.id && 
+                             new Date(n.created).toDateString() === today.toDateString()
+                    );
+                    
+                    if (!notificationExists) {
+                        createChaserNotification(chaser);
+                    }
+                }
+            });
+            
+            updateNotificationCount();
+        }
+
+        function loadNotifications() {
+            const notificationsList = document.getElementById('notifications-list');
+            const notifications = appData.notifications.sort((a, b) => new Date(b.created) - new Date(a.created));
+            
+            if (notifications.length === 0) {
+                notificationsList.innerHTML = '<p class="text-gray-500 text-center py-4">No notifications</p>';
+                return;
+            }
+            
+            notificationsList.innerHTML = '';
+            
+            notifications.forEach(notification => {
+                const property = appData.properties.find(p => p.id === notification.propertyId);
+                const propertyName = property ? property.name : 'Unknown property';
+                
+                const chaserDate = new Date(notification.date);
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                
+                let dateText = formatDate(notification.date);
+                if (isSameDay(chaserDate, today)) {
+                    dateText = 'Today';
+                } else if (isSameDay(chaserDate, tomorrow)) {
+                    dateText = 'Tomorrow';
+                }
+                
+                const notificationItem = document.createElement('div');
+                notificationItem.className = `p-3 border rounded-lg transition ${notification.read ? 'bg-gray-50' : 'bg-blue-50 border-blue-200'}`;
+                notificationItem.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="font-medium">${notification.title}</p>
+                            <p class="text-sm text-gray-600">${propertyName}</p>
+                            <p class="text-sm text-gray-500 mt-1">Due: ${dateText}</p>
+                        </div>
+                        ${!notification.read ? `
+                            <button class="text-blue-600 hover:text-blue-800 mark-read" data-id="${notification.id}">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                
+                notificationsList.appendChild(notificationItem);
+            });
+            
+            // Add event listeners for mark as read buttons
+            document.querySelectorAll('.mark-read').forEach(button => {
+                button.addEventListener('click', () => {
+                    const notificationId = button.getAttribute('data-id');
+                    markNotificationAsRead(notificationId);
+                });
+            });
+        }
+
+        function markNotificationAsRead(notificationId) {
+            const notification = appData.notifications.find(n => n.id === notificationId);
+            if (notification) {
+                notification.read = true;
+                saveData();
+                loadNotifications();
+                updateNotificationCount();
+            }
+        }
+
+        function clearAllNotifications() {
+            appData.notifications = [];
+            saveData();
+            loadNotifications();
+            updateNotificationCount();
+            closeNotificationDrawer();
+        }
+
+        function openNotificationDrawer() {
+            document.getElementById('notification-drawer').classList.remove('translate-x-full');
+            loadNotifications();
+        }
+
+        function closeNotificationDrawer() {
+            document.getElementById('notification-drawer').classList.add('translate-x-full');
+        }
+
+        // Mobile menu functions
+        function openMobileMenu() {
+            document.getElementById('mobile-menu').classList.remove('hidden');
+            document.getElementById('mobile-menu-content').classList.add('slide-in');
+        }
+
+        function closeMobileMenu() {
+            const mobileMenu = document.getElementById('mobile-menu');
+            const mobileMenuContent = document.getElementById('mobile-menu-content');
+            
+            mobileMenuContent.classList.remove('slide-in');
+            mobileMenuContent.classList.add('slide-out');
+            
+            setTimeout(() => {
+                mobileMenu.classList.add('hidden');
+                mobileMenuContent.classList.remove('slide-out');
+            }, 300);
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load saved data
+            if (loadData()) {
+                refreshPropertyList();
+                refreshDashboard();
+            }
+            
+            // Set up view navigation
+            document.getElementById('view-dashboard').addEventListener('click', () => showView('dashboard'));
+            document.getElementById('view-properties').addEventListener('click', () => showView('properties'));
+            document.getElementById('view-upcoming').addEventListener('click', () => showView('upcoming'));
+            document.getElementById('view-settings').addEventListener('click', () => showView('settings'));
+            
+            // Mobile navigation
+            document.querySelectorAll('.mobile-nav-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const viewId = button.getAttribute('data-view');
+                    showView(viewId);
+                });
+            });
+            
+            // Set up add property button
+            document.getElementById('add-property-btn').addEventListener('click', openAddPropertyModal);
+            document.getElementById('mobile-add-property').addEventListener('click', () => {
+                openAddPropertyModal();
+                closeMobileMenu();
+            });
+            
+            // Set up property form
+            document.getElementById('add-property-form').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                // Create new property
+                const newProperty = {
+                    id: generateId(),
+                    name: document.getElementById('property-name').value,
+                    address: document.getElementById('property-address').value,
+                    landlordName: document.getElementById('landlord-name').value,
+                    landlordContact: document.getElementById('landlord-contact').value,
+                    notes: document.getElementById('property-notes').value,
+                    created: new Date().toISOString()
+                };
+                
+                // Add property to data
+                appData.properties.push(newProperty);
+                
+                // Save data
+                saveData();
+                
+                // Add activity
+                addActivity(`New property added: ${newProperty.name}`, newProperty.id);
+                
+                // Refresh UI
+                refreshPropertyList();
+                loadPropertyDetail(newProperty.id);
+                
+                // Close modal
+                document.getElementById('add-property-modal').classList.add('hidden');
+                
+                // Show notification
+                showNotification('Success', 'Property added successfully', 'success');
+            });
+            
+            // Set up bill type selection
+            document.getElementById('bill-type').addEventListener('change', function() {
+                if (this.value === 'other') {
+                    document.getElementById('other-bill-type-container').classList.remove('hidden');
+                } else {
+                    document.getElementById('other-bill-type-container').classList.add('hidden');
+                }
+            });
+            
+            // Set up bill file upload
+            const uploadArea = document.getElementById('bill-upload-area');
+            const fileInput = document.getElementById('bill-file');
+            
+            uploadArea.addEventListener('click', () => {
+                fileInput.click();
+            });
+            
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('border-indigo-500', 'bg-indigo-50');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('border-indigo-500', 'bg-indigo-50');
+            });
+            
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('border-indigo-500', 'bg-indigo-50');
+                
+                if (e.dataTransfer.files.length > 0) {
+                    handleFileUpload(e.dataTransfer.files[0]);
+                }
+            });
+            
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length > 0) {
+                    handleFileUpload(fileInput.files[0]);
+                }
+            });
+            
+            function handleFileUpload(file) {
+                // Check file size (max 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    showNotification('Error', 'File size exceeds 5MB limit', 'error');
+                    return;
+                }
+                
+                // Check file type
+                if (!['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'].includes(file.type)) {
+                    showNotification('Error', 'File type not supported. Please upload PDF, JPG, or PNG', 'error');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    uploadedFile = {
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        data: e.target.result
+                    };
+                    
+                    // Show file preview
+                    document.getElementById('file-preview-container').classList.remove('hidden');
+                    document.getElementById('file-name').textContent = file.name;
+                };
+                
+                reader.readAsDataURL(file);
+            }
+            
+            document.getElementById('remove-file').addEventListener('click', () => {
+                uploadedFile = null;
+                fileInput.value = '';
+                document.getElementById('file-preview-container').classList.add('hidden');
+            });
+            
+            // Set up export buttons
+            document.getElementById('export-json').addEventListener('click', () => {
+                exportData('json');
+            });
+            
+            document.getElementById('export-csv').addEventListener('click', () => {
+                exportData('csv');
+            });
+            
+            document.getElementById('export-data').addEventListener('click', () => {
+                exportData('json');
+            });
+            
+            // Set up import button
+            document.getElementById('import-btn').addEventListener('click', () => {
+                document.getElementById('import-data').click();
+            });
+            
+            document.getElementById('import-data').addEventListener('change', function() {
+                if (this.files.length > 0) {
+                    const file = this.files[0];
+                    
+                    if (file.type !== 'application/json') {
+                        showNotification('Error', 'Please select a JSON file', 'error');
+                        return;
+                    }
+                    
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        try {
+                            const importedData = JSON.parse(e.target.result);
+                            
+                            if (importData(importedData)) {
+                                showNotification('Success', 'Data imported successfully', 'success');
+                            }
+                        } catch (error) {
+                            console.error('Error parsing JSON:', error);
+                            showNotification('Error', 'Failed to parse JSON file', 'error');
+                        }
+                    };
+                    
+                    reader.readAsText(file);
+                }
+            });
+            
+            // Set up clear data button
+            document.getElementById('clear-data').addEventListener('click', clearAllData);
+            
+            // Set up notification bell
+            document.getElementById('notification-bell').addEventListener('click', openNotificationDrawer);
+            document.getElementById('close-notification').addEventListener('click', closeNotificationDrawer);
+            document.getElementById('clear-notifications').addEventListener('click', clearAllNotifications);
+            
+            // Set up notification toast close button
+            document.getElementById('close-toast').addEventListener('click', () => {
+                document.getElementById('notification').classList.remove('show');
+            });
+            
+            // Set up mobile menu
+            document.getElementById('mobile-menu-toggle').addEventListener('click', openMobileMenu);
+            document.getElementById('close-mobile-menu').addEventListener('click', closeMobileMenu);
+            
+            // Set up modal close buttons
+            document.querySelectorAll('.close-modal').forEach(button => {
+                button.addEventListener('click', () => {
+                    // Find the parent modal
+                    const modal = button.closest('[id$="-modal"]');
+                    if (modal) {
+                        modal.classList.add('hidden');
+                    }
+                });
+            });
+            
+            // Set up chaser filter and sort
+            document.getElementById('chaser-filter').addEventListener('change', refreshUpcomingChasers);
+            document.getElementById('chaser-sort').addEventListener('change', refreshUpcomingChasers);
+            
+            // Set up property search and sort
+            document.getElementById('property-search').addEventListener('input', refreshPropertiesGrid);
+            document.getElementById('property-sort').addEventListener('change', refreshPropertiesGrid);
+            
+            // Set up settings changes
+            document.getElementById('dark-mode-toggle').addEventListener('change', function() {
+                appData.settings.darkMode = this.checked;
+                saveData();
+                applyDarkMode();
+            });
+            
+            document.getElementById('enable-notifications').addEventListener('change', function() {
+                appData.settings.enableNotifications = this.checked;
+                saveData();
+            });
+            
+            document.getElementById('notification-days').addEventListener('change', function() {
+                appData.settings.notificationDays = parseInt(this.value);
+                saveData();
+            });
+            
+            // Apply settings
+            applySettings();
+            
+            // Show dashboard by default
+            showView('dashboard');
+        });
+
+        function applySettings() {
+            // Apply dark mode
+            document.getElementById('dark-mode-toggle').checked = appData.settings.darkMode;
+            applyDarkMode();
+            
+            // Apply notification settings
+            document.getElementById('enable-notifications').checked = appData.settings.enableNotifications;
+            document.getElementById('notification-days').value = appData.settings.notificationDays;
+        }
+
+        function applyDarkMode() {
+            if (appData.settings.darkMode) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+    </script>
+</body>
+</html>
