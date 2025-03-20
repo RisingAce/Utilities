@@ -22,6 +22,28 @@
             transition: all 0.3s;
         }
         
+        .global-drop-zone {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(79, 70, 229, 0.2);
+            border: 4px dashed #4f46e5;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        
+        .global-drop-zone.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        
         .upload-area:hover {
             border-color: #4f46e5;
             background-color: rgba(79, 70, 229, 0.05);
@@ -700,6 +722,57 @@
             <button id="close-toast" class="ml-auto text-gray-400 hover:text-gray-600">
                 <i class="fas fa-times"></i>
             </button>
+        </div>
+    </div>
+    
+    <!-- Global email drop zone -->
+    <div id="global-drop-zone" class="global-drop-zone">
+        <div class="bg-white p-6 rounded-lg shadow-lg text-center max-w-md mx-4">
+            <i class="fas fa-envelope text-indigo-500 text-5xl mb-4"></i>
+            <h3 class="text-xl font-bold mb-2">Drop Email Here</h3>
+            <p class="text-gray-600 mb-2">Drop your email file or copied email text to automatically extract property and utility information</p>
+            <p class="text-sm text-gray-500">Supports .eml files, Outlook messages, or copied email text</p>
+        </div>
+    </div>
+    
+    <!-- Email content parser modal -->
+    <div id="email-parser-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg w-full max-w-3xl mx-4 p-6 max-h-screen overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold">Process Email</h2>
+                <button class="text-gray-500 hover:text-gray-700 close-modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="mb-6 pt-4 pb-4 border-t border-b">
+                <h3 class="font-medium text-gray-700 mb-2">Extracted Information</h3>
+                <div id="extracted-info" class="space-y-4">
+                    <!-- Extracted information will be displayed here -->
+                </div>
+            </div>
+            <div class="mb-6">
+                <h3 class="font-medium text-gray-700 mb-2">What would you like to create?</h3>
+                <div class="flex flex-wrap gap-4">
+                    <button id="create-property-btn" class="flex-1 bg-indigo-600 text-white rounded-md py-3 px-4 hover:bg-indigo-700 transition flex items-center justify-center">
+                        <i class="fas fa-building mr-2"></i> New Property
+                    </button>
+                    <button id="create-bill-btn" class="flex-1 bg-green-600 text-white rounded-md py-3 px-4 hover:bg-green-700 transition flex items-center justify-center">
+                        <i class="fas fa-file-invoice-dollar mr-2"></i> New Bill
+                    </button>
+                    <button id="create-chaser-btn" class="flex-1 bg-yellow-500 text-white rounded-md py-3 px-4 hover:bg-yellow-600 transition flex items-center justify-center">
+                        <i class="fas fa-calendar-plus mr-2"></i> New Chaser
+                    </button>
+                </div>
+            </div>
+            <div class="mb-6 pt-4 border-t">
+                <h3 class="font-medium text-gray-700 mb-2">Original Email Content</h3>
+                <div id="email-content" class="bg-gray-50 p-4 rounded text-sm max-h-64 overflow-y-auto whitespace-pre-wrap">
+                    <!-- Email content will be displayed here -->
+                </div>
+            </div>
+            <div class="flex justify-end">
+                <button type="button" class="bg-gray-300 text-gray-700 rounded-md py-2 px-4 hover:bg-gray-400 transition close-modal">Close</button>
+            </div>
         </div>
     </div>
 
@@ -3382,6 +3455,397 @@
             } else {
                 document.documentElement.classList.remove('dark');
             }
+        }
+
+        // Email drag and drop functionality
+        const globalDropZone = document.getElementById('global-drop-zone');
+        
+        // Enable drag and drop for the entire document
+        document.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            
+            // Check if the dragged item is likely an email (based on data type)
+            const isEmail = Array.from(e.dataTransfer.items).some(item => 
+                item.kind === 'file' && 
+                (item.type === 'message/rfc822' || item.type === 'application/vnd.ms-outlook' || item.type === '')
+            ) || 
+            (e.dataTransfer.types && e.dataTransfer.types.includes('text/plain'));
+            
+            if (isEmail) {
+                globalDropZone.classList.add('active');
+            }
+        });
+        
+        document.addEventListener('dragleave', (e) => {
+            // Only deactivate if leaving the viewport
+            if (!e.relatedTarget || e.relatedTarget.nodeName === 'HTML') {
+                globalDropZone.classList.remove('active');
+            }
+        });
+        
+        document.addEventListener('drop', (e) => {
+            e.preventDefault();
+            globalDropZone.classList.remove('active');
+            
+            let emailContent = '';
+            let fileName = '';
+            
+            // Handle dropped files (actual email files)
+            if (e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                fileName = file.name;
+                
+                if (file.type === 'message/rfc822' || file.type === 'application/vnd.ms-outlook' || file.name.endsWith('.eml') || file.name.endsWith('.msg')) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        emailContent = event.target.result;
+                        processEmailContent(emailContent, fileName);
+                    };
+                    reader.readAsText(file);
+                    return;
+                }
+            }
+            
+            // Handle dropped text (copied email content)
+            if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+                for (const item of e.dataTransfer.items) {
+                    if (item.kind === 'string' && item.type === 'text/plain') {
+                        item.getAsString(function(text) {
+                            emailContent = text;
+                            processEmailContent(emailContent, 'Copied email text');
+                        });
+                        return;
+                    }
+                }
+            }
+        });
+        
+        function processEmailContent(content, source) {
+            // Display the original email content
+            document.getElementById('email-content').textContent = content;
+            
+            // Extract common patterns from email
+            const extractedInfo = extractInformationFromEmail(content);
+            
+            // Display extracted information
+            displayExtractedInfo(extractedInfo);
+            
+            // Show the parser modal
+            document.getElementById('email-parser-modal').classList.remove('hidden');
+            
+            // Set up event listeners for action buttons
+            setupEmailParserActions(extractedInfo);
+        }
+        
+        function extractInformationFromEmail(content) {
+            // Initialize extracted info object
+            const info = {
+                propertyName: '',
+                address: '',
+                utilityType: '',
+                provider: '',
+                amount: '',
+                dueDate: '',
+                notes: []
+            };
+            
+            // Extract property name/address
+            const addressRegex = /(?:property|address|location|premises)(?:\s*:|\s+at|\s+is|\s+in)\s*([^\n,\.]+(?:,\s*[^\n\.]+)*)/i;
+            const addressMatch = content.match(addressRegex);
+            if (addressMatch) {
+                const fullAddress = addressMatch[1].trim();
+                
+                // Use the first line as property name and full text as address
+                const lines = fullAddress.split(',');
+                info.propertyName = lines[0].trim();
+                info.address = fullAddress;
+            }
+            
+            // Try alternative address match
+            if (!info.propertyName) {
+                const alternateAddressRegex = /(\d+\s+[^\n,\.]+(?:,\s*[^\n\.]+)*)/i;
+                const alternateMatch = content.match(alternateAddressRegex);
+                if (alternateMatch) {
+                    info.propertyName = alternateMatch[1].trim();
+                    info.address = alternateMatch[1].trim();
+                }
+            }
+            
+            // Extract utility type
+            const utilityTypes = ['electricity', 'gas', 'water', 'internet', 'council tax', 'utility', 'energy'];
+            for (const type of utilityTypes) {
+                if (content.toLowerCase().includes(type)) {
+                    info.utilityType = type;
+                    break;
+                }
+            }
+            
+            // Extract provider names - check against common UK providers
+            const commonProviders = [
+                'British Gas', 'EDF', 'EON', 'E.ON', 'Scottish Power', 'ScottishPower', 
+                'SSE', 'Bulb', 'Octopus', 'Thames Water', 'Anglian Water', 'BT', 'Virgin Media',
+                'Sky', 'TalkTalk', 'Vodafone', 'Shell Energy', 'Ovo', 'Utilita', 'City Council'
+            ];
+            
+            for (const provider of commonProviders) {
+                if (content.includes(provider)) {
+                    info.provider = provider;
+                    break;
+                }
+            }
+            
+            // Extract amount (looking for currency patterns)
+            const amountRegex = /(?:£|GBP|pound|amount|bill|payment|due)(?:\s*:|\s+of|\s+is|\s+for)?\s*(?:£|\$)?(\d+(?:\.\d{2})?)/i;
+            const amountMatch = content.match(amountRegex);
+            if (amountMatch) {
+                info.amount = amountMatch[1].trim();
+            }
+            
+            // Extract due date
+            const dateRegex = /(?:due|payment|deadline|by)(?:\s*:|\s+date|\s+on|\s+by)?\s*(\d{1,2}[\/\.-]\d{1,2}[\/\.-]\d{2,4}|\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*(?:\s+\d{2,4})?)/i;
+            const dateMatch = content.match(dateRegex);
+            if (dateMatch) {
+                info.dueDate = dateMatch[1].trim();
+                
+                // Try to convert to standard format
+                try {
+                    const parsedDate = new Date(info.dueDate);
+                    if (!isNaN(parsedDate.getTime())) {
+                        info.dueDate = parsedDate.toISOString().split('T')[0];
+                    }
+                } catch (e) {
+                    // Keep original format if parsing fails
+                }
+            }
+            
+            // Extract potential notes (important sentences)
+            const sentences = content.match(/[^.!?]+[.!?]+/g) || [];
+            for (const sentence of sentences) {
+                if (sentence.toLowerCase().includes('urgent') || 
+                    sentence.toLowerCase().includes('important') || 
+                    sentence.toLowerCase().includes('please note') ||
+                    sentence.toLowerCase().includes('action required')) {
+                    info.notes.push(sentence.trim());
+                }
+            }
+            
+            return info;
+        }
+        
+        function displayExtractedInfo(info) {
+            const extractedInfoContainer = document.getElementById('extracted-info');
+            extractedInfoContainer.innerHTML = '';
+            
+            const fields = [
+                { label: 'Property Name', value: info.propertyName, icon: 'fas fa-building' },
+                { label: 'Address', value: info.address, icon: 'fas fa-map-marker-alt' },
+                { label: 'Utility Type', value: info.utilityType, icon: 'fas fa-plug' },
+                { label: 'Provider', value: info.provider, icon: 'fas fa-industry' },
+                { label: 'Amount', value: info.amount ? `£${info.amount}` : '', icon: 'fas fa-pound-sign' },
+                { label: 'Due Date', value: info.dueDate, icon: 'fas fa-calendar-day' }
+            ];
+            
+            fields.forEach(field => {
+                if (field.value) {
+                    const fieldElement = document.createElement('div');
+                    fieldElement.className = 'flex items-start';
+                    fieldElement.innerHTML = `
+                        <div class="mr-3 text-indigo-500">
+                            <i class="${field.icon}"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">${field.label}</p>
+                            <p class="font-medium">${field.value}</p>
+                        </div>
+                    `;
+                    extractedInfoContainer.appendChild(fieldElement);
+                }
+            });
+            
+            // Add notes if available
+            if (info.notes.length > 0) {
+                const notesElement = document.createElement('div');
+                notesElement.className = 'flex items-start';
+                notesElement.innerHTML = `
+                    <div class="mr-3 text-indigo-500">
+                        <i class="fas fa-sticky-note"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">Important Notes</p>
+                        <ul class="list-disc list-inside text-sm space-y-1">
+                            ${info.notes.map(note => `<li>${note}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+                extractedInfoContainer.appendChild(notesElement);
+            }
+            
+            // If no information was extracted
+            if (extractedInfoContainer.children.length === 0) {
+                extractedInfoContainer.innerHTML = `
+                    <div class="text-center py-3">
+                        <i class="fas fa-exclamation-circle text-yellow-500 text-xl mb-2"></i>
+                        <p class="text-gray-500">No information could be automatically extracted from this email.</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function setupEmailParserActions(info) {
+            // Set up create property button
+            document.getElementById('create-property-btn').onclick = () => {
+                // Close the parser modal
+                document.getElementById('email-parser-modal').classList.add('hidden');
+                
+                // Open add property modal and populate it
+                openAddPropertyModal();
+                
+                // Pre-fill the form with extracted info
+                if (info.propertyName) document.getElementById('property-name').value = info.propertyName;
+                if (info.address) document.getElementById('property-address').value = info.address;
+                
+                // Add any extracted notes
+                if (info.notes.length > 0) {
+                    document.getElementById('property-notes').value = info.notes.join('\n\n');
+                }
+            };
+            
+            // Set up create bill button
+            document.getElementById('create-bill-btn').onclick = () => {
+                // Close the parser modal
+                document.getElementById('email-parser-modal').classList.add('hidden');
+                
+                // Check if we need to create a property first
+                if (info.propertyName && appData.properties.length === 0) {
+                    // Automatically create a property
+                    const newProperty = {
+                        id: generateId(),
+                        name: info.propertyName,
+                        address: info.address,
+                        created: new Date().toISOString()
+                    };
+                    
+                    appData.properties.push(newProperty);
+                    saveData();
+                    refreshPropertyList();
+                    
+                    // Open add bill modal for this property
+                    openAddBillModal(newProperty.id);
+                } else {
+                    // If we have properties, but need to select one
+                    if (appData.properties.length > 0) {
+                        // Use current property if in property view, otherwise show property selection
+                        if (currentPropertyId) {
+                            openAddBillModal(currentPropertyId);
+                        } else {
+                            // Just open the bills tab and user can select property
+                            showView('properties');
+                            showNotification('Info', 'Please select a property to add the bill to', 'info');
+                            return;
+                        }
+                    } else {
+                        // No properties yet, show notification
+                        showNotification('Info', 'Please create a property first', 'info');
+                        return;
+                    }
+                }
+                
+                // Pre-fill the bill form with extracted info
+                if (info.utilityType) {
+                    // Map the extracted utility type to form options
+                    const typeSelect = document.getElementById('bill-type');
+                    const type = info.utilityType.toLowerCase();
+                    
+                    if (type.includes('electric')) {
+                        typeSelect.value = 'electricity';
+                    } else if (type.includes('gas')) {
+                        typeSelect.value = 'gas';
+                    } else if (type.includes('water')) {
+                        typeSelect.value = 'water';
+                    } else if (type.includes('internet') || type.includes('broadband')) {
+                        typeSelect.value = 'internet';
+                    } else if (type.includes('council') || type.includes('tax')) {
+                        typeSelect.value = 'council-tax';
+                    } else {
+                        typeSelect.value = 'other';
+                        document.getElementById('other-bill-type-container').classList.remove('hidden');
+                        document.getElementById('other-bill-type').value = info.utilityType;
+                    }
+                }
+                
+                if (info.provider) document.getElementById('bill-provider').value = info.provider;
+                if (info.amount) document.getElementById('bill-amount').value = info.amount;
+                if (info.dueDate) document.getElementById('bill-due-date').value = info.dueDate;
+                
+                // Add any extracted notes
+                if (info.notes.length > 0) {
+                    document.getElementById('bill-notes').value = info.notes.join('\n\n');
+                }
+            };
+            
+            // Set up create chaser button
+            document.getElementById('create-chaser-btn').onclick = () => {
+                // Close the parser modal
+                document.getElementById('email-parser-modal').classList.add('hidden');
+                
+                // Check if we need to create a property first
+                if (info.propertyName && appData.properties.length === 0) {
+                    // Automatically create a property
+                    const newProperty = {
+                        id: generateId(),
+                        name: info.propertyName,
+                        address: info.address,
+                        created: new Date().toISOString()
+                    };
+                    
+                    appData.properties.push(newProperty);
+                    saveData();
+                    refreshPropertyList();
+                    
+                    // Open add chaser modal for this property
+                    openAddChaserModal(newProperty.id);
+                } else {
+                    // If we have properties, but need to select one
+                    if (appData.properties.length > 0) {
+                        // Use current property if in property view, otherwise show property selection
+                        if (currentPropertyId) {
+                            openAddChaserModal(currentPropertyId);
+                        } else {
+                            // Just open the properties tab and user can select property
+                            showView('properties');
+                            showNotification('Info', 'Please select a property to add the chaser to', 'info');
+                            return;
+                        }
+                    } else {
+                        // No properties yet, show notification
+                        showNotification('Info', 'Please create a property first', 'info');
+                        return;
+                    }
+                }
+                
+                // Pre-fill the chaser form with extracted info
+                if (info.utilityType) {
+                    document.getElementById('chaser-title').value = `Follow up on ${info.utilityType} bill`;
+                }
+                
+                if (info.dueDate) {
+                    document.getElementById('chaser-date').value = info.dueDate;
+                }
+                
+                // Add any extracted notes
+                if (info.notes.length > 0) {
+                    document.getElementById('chaser-notes').value = info.notes.join('\n\n');
+                }
+                
+                // If urgent is mentioned, set priority to high
+                if (info.notes.some(note => 
+                    note.toLowerCase().includes('urgent') || 
+                    note.toLowerCase().includes('immediately') ||
+                    note.toLowerCase().includes('as soon as possible')
+                )) {
+                    document.getElementById('chaser-priority').value = 'high';
+                }
+            };
         }
     </script>
 </body>
